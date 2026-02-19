@@ -1,143 +1,103 @@
-import { useState } from "react";
-import { detectVoiceScam } from "../services/api";
+import React, { useState } from "react";
 
 export default function VoiceDetectionPage() {
-  const [transcript, setTranscript] = useState("");
-  const [result, setResult] = useState(null);
-  const [listening, setListening] = useState(false);
+  const [text, setText] = useState("");
+  const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
-  let recognition;
+  const handleSpeechToText = () => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  if ("webkitSpeechRecognition" in window) {
-    recognition = new window.webkitSpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-IN";
-  }
-
-  const startListening = () => {
-    if (!recognition) {
-      alert("Speech recognition not supported in your browser!");
+    if (!SpeechRecognition) {
+      alert("Speech Recognition not supported in your browser");
       return;
     }
 
-    setListening(true);
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
     recognition.start();
 
     recognition.onresult = (event) => {
-      let finalText = "";
-      for (let i = 0; i < event.results.length; i++) {
-        finalText += event.results[i][0].transcript;
-      }
-      setTranscript(finalText);
+      const spokenText = event.results[0][0].transcript;
+      setText(spokenText);
+    };
+
+    recognition.onerror = () => {
+      alert("Error while recording voice");
     };
   };
 
-  const stopListening = () => {
-    if (recognition) recognition.stop();
-    setListening(false);
-  };
-
   const handleDetect = async () => {
-    if (!transcript.trim()) {
-      alert("Please record some voice first!");
+    if (!text.trim()) {
+      alert("Please speak something first");
       return;
     }
 
     setLoading(true);
-    setResult(null);
+    setResult("");
 
     try {
-      const res = await detectVoiceScam(transcript);
-      setResult(res);
-    } catch (err) {
-      console.error(err);
-      alert("Error while detecting voice scam!");
+      const res = await fetch("http://127.0.0.1:5001/predict", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setResult(data.error || "Something went wrong");
+        setLoading(false);
+        return;
+      }
+
+      if (data.scam) {
+        setResult("⚠️ Scam Voice Detected! Be careful.");
+      } else {
+        setResult("✅ Safe Voice Message");
+      }
+    } catch (error) {
+      console.log(error);
+      setResult("❌ Server Error");
     }
 
     setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center px-4 py-10">
-      <div className="w-full max-w-3xl">
-        <h1 className="text-3xl font-bold mb-6 text-gray-800">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 px-4">
+      <div className="bg-white shadow-lg rounded-lg p-6 w-full max-w-lg">
+        <h2 className="text-2xl font-bold text-center mb-4">
           Voice Scam Detection
-        </h1>
+        </h2>
 
-        <div className="bg-white shadow-lg rounded-xl p-6">
-          <div className="flex gap-4 mb-5">
-            <button
-              onClick={startListening}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition"
-              disabled={listening}
-            >
-              Start
-            </button>
+        <button
+          onClick={handleSpeechToText}
+          className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 mb-4"
+        >
+          🎤 Speak Now
+        </button>
 
-            <button
-              onClick={stopListening}
-              className="bg-red-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-700 transition"
-              disabled={!listening}
-            >
-              Stop
-            </button>
+        <textarea
+          rows="4"
+          className="w-full border p-3 rounded mb-4"
+          placeholder="Voice will convert into text here..."
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
 
-            <button
-              onClick={handleDetect}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition"
-              disabled={loading}
-            >
-              {loading ? "Detecting..." : "Detect Scam"}
-            </button>
-          </div>
+        <button
+          onClick={handleDetect}
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+        >
+          {loading ? "Detecting..." : "Detect Scam"}
+        </button>
 
-          <textarea
-            rows="7"
-            className="w-full border border-gray-300 rounded-lg p-4 text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-            placeholder="Transcript will appear here..."
-            value={transcript}
-            onChange={(e) => setTranscript(e.target.value)}
-          />
-
-          <div className="flex justify-end mt-4">
-            <button
-              onClick={() => {
-                setTranscript("");
-                setResult(null);
-              }}
-              className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-semibold hover:bg-gray-300 transition"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-
-        {/* RESULT BOX */}
         {result && (
-          <div className="mt-8 bg-white shadow-lg rounded-xl p-6 border-l-8 border-red-500">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">
-              Detection Result
-            </h2>
-
-            <p className="text-lg text-gray-700 mb-2">
-              <span className="font-semibold">Type:</span>{" "}
-              <span className="text-blue-600 font-bold">{result.type}</span>
-            </p>
-
-            <p className="text-lg text-gray-700 mb-2">
-              <span className="font-semibold">Risk:</span>{" "}
-              <span className="text-red-600 font-bold">
-                {result.riskPercentage}%
-              </span>
-            </p>
-
-            <p className="text-lg text-gray-700">
-              <span className="font-semibold">Suggestion:</span>{" "}
-              {result.suggestion}
-            </p>
-          </div>
+          <p className="mt-4 text-center font-semibold text-lg">{result}</p>
         )}
       </div>
     </div>

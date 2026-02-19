@@ -1,14 +1,13 @@
-import { useState } from "react";
-import { detectTextScam } from "../services/api";
+import React, { useState } from "react";
 
 export default function TextDetectionPage() {
-  const [message, setMessage] = useState("");
+  const [text, setText] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handleDetect = async () => {
-    if (!message.trim()) {
-      alert("Please enter a message first!");
+    if (!text.trim()) {
+      alert("Please enter some text!");
       return;
     }
 
@@ -16,11 +15,27 @@ export default function TextDetectionPage() {
     setResult(null);
 
     try {
-      const res = await detectTextScam(message);
-      setResult(res);
+      const res = await fetch("http://127.0.0.1:5001/predict", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Something went wrong!");
+        setLoading(false);
+        return;
+      }
+
+      // data = { scam: true/false, label: 0/1 }
+      setResult(data);
     } catch (err) {
       console.error(err);
-      alert("Something went wrong while detecting scam!");
+      alert("Server error while detecting scam!");
     }
 
     setLoading(false);
@@ -34,19 +49,15 @@ export default function TextDetectionPage() {
         </h1>
 
         <div className="bg-white shadow-lg rounded-xl p-6">
-          <label className="block text-lg font-semibold text-gray-700 mb-3">
-            Enter SMS / WhatsApp Message
-          </label>
-
           <textarea
-            rows="6"
+            rows="7"
             className="w-full border border-gray-300 rounded-lg p-4 text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-            placeholder="Paste your suspicious SMS/WhatsApp message here..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Enter SMS / Email / Message text here..."
+            value={text}
+            onChange={(e) => setText(e.target.value)}
           />
 
-          <div className="flex justify-between items-center mt-5">
+          <div className="flex gap-4 mt-5">
             <button
               onClick={handleDetect}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition"
@@ -57,7 +68,7 @@ export default function TextDetectionPage() {
 
             <button
               onClick={() => {
-                setMessage("");
+                setText("");
                 setResult(null);
               }}
               className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-semibold hover:bg-gray-300 transition"
@@ -69,27 +80,34 @@ export default function TextDetectionPage() {
 
         {/* RESULT BOX */}
         {result && (
-          <div className="mt-8 bg-white shadow-lg rounded-xl p-6 border-l-8 
-            border-red-500">
+          <div
+            className={`mt-8 bg-white shadow-lg rounded-xl p-6 border-l-8 ${
+              result.scam ? "border-red-600" : "border-green-600"
+            }`}
+          >
             <h2 className="text-2xl font-bold text-gray-800 mb-4">
               Detection Result
             </h2>
 
-            <p className="text-lg text-gray-700 mb-2">
-              <span className="font-semibold">Type:</span>{" "}
-              <span className="text-blue-600 font-bold">{result.type}</span>
+            {result.scam ? (
+              <p className="text-xl font-bold text-red-600">
+                ❌ Scam Text Detected! Be careful.
+              </p>
+            ) : (
+              <p className="text-xl font-bold text-green-600">
+                ✅ Safe Text Message
+              </p>
+            )}
+
+            <p className="mt-4 text-gray-700 text-lg">
+              <span className="font-semibold">Label:</span> {result.label}
             </p>
 
-            <p className="text-lg text-gray-700 mb-2">
-              <span className="font-semibold">Risk:</span>{" "}
-              <span className="text-red-600 font-bold">
-                {result.riskPercentage}%
-              </span>
-            </p>
-
-            <p className="text-lg text-gray-700">
+            <p className="mt-2 text-gray-700 text-lg">
               <span className="font-semibold">Suggestion:</span>{" "}
-              {result.suggestion}
+              {result.scam
+                ? "Do not click links or share OTP. Verify sender first."
+                : "Looks safe, but still verify before making payments."}
             </p>
           </div>
         )}
