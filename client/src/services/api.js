@@ -1,7 +1,7 @@
 export const detectVoiceScam = async (text) => {
   try {
     const response = await fetch(
-      "https://scam-backend-6kgl.onrender.com",
+      "https://scam-detector-production.up.railway.app/predict",
       {
         method: "POST",
         headers: {
