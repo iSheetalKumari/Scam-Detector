@@ -15,7 +15,7 @@ export default function TextDetectionPage() {
     setResult(null);
 
     try {
-      const res = await fetch("http://127.0.0.1:5001/predict", {
+      const res = await fetch("https://scam-detector-production.up.railway.app/predict", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
